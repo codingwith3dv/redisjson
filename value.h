@@ -1,3 +1,5 @@
+#pragma once
+
 #include "redismodule.h"
 #include <stdint.h>
 

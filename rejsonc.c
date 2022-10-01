@@ -1,5 +1,6 @@
 #include "redismodule.h"
 #include "value.h"
+#include "jsonToValue.h"
 
 static RedisModuleType* jsonType;
 
@@ -51,7 +52,9 @@ int JsonSetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     return REDISMODULE_ERR;
   }
 
-  long long num;
+  JsonValue* val = parseJson(ctx, json);
+
+  /* long long num;
   RedisModule_StringToLongLong(argv[3], &num);
   
   JsonValue* ageV = allocNumber(num);
@@ -66,7 +69,7 @@ int JsonSetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
   } else {
     JsonValue* v1 = RedisModule_ModuleTypeGetValue(key);
     *v1 = *v;
-  }
+  } */
 
   RedisModule_ReplyWithStringBuffer(ctx, json, len);
 

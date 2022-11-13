@@ -5,7 +5,8 @@
 
 typedef enum {
   OBJECT,
-  NUMBER
+  NUMBER,
+  STRING
 } JsonValueType;
 
 struct JsonValue;
@@ -17,12 +18,18 @@ typedef struct {
 
 struct JsonObject {
   JsonKeyVal** elements;
-  uint64_t size;
+  size_t size;
 };
+
+typedef struct {
+  const char* data;
+  size_t size;
+} JsonString;
 
 typedef struct JsonValue {
   union {
     long long number;
+    JsonString string;
     struct JsonObject object;
   } value;
   JsonValueType type;
@@ -33,7 +40,7 @@ typedef struct {
 } RedisJsonValue;
 
 JsonValue* allocNumber(long long num);
-JsonValue* allocObject(uint64_t size);
+JsonValue* allocObject(size_t size);
 
 void JsonTypeRdbSaveImpl(RedisModuleIO* rdb, JsonValue* value);
 void JsonTypeRdbLoadImpl(RedisModuleIO* rdb, JsonValue* value);

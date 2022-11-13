@@ -7,7 +7,7 @@ void loadObject(
   struct JsonObject* object
 ) {
   object->elements = RedisModule_Calloc(object->size, sizeof(JsonKeyVal*));
-  for(uint64_t i = 0; i < object->size; i++) {
+  for(size_t i = 0; i < object->size; i++) {
     JsonKeyVal* keyVal = RedisModule_Calloc(1, sizeof(JsonKeyVal));
     size_t len;
     keyVal->key = RedisModule_LoadStringBuffer(rdb, &len);
@@ -28,6 +28,14 @@ static void loadSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
       value->value.object.size = RedisModule_LoadUnsigned(rdb);
       break;
     }
+    case STRING: {
+      value->value.string.data =
+        RedisModule_LoadStringBuffer(
+          rdb,
+          &value->value.string.size
+        );
+      break;
+    }
   }
 }
 
@@ -45,12 +53,22 @@ void JsonTypeRdbLoadImpl(RedisModuleIO* rdb, JsonValue* value) {
 static void saveSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
   RedisModule_SaveUnsigned(rdb, value->type);
   switch(value->type) {
-    case NUMBER:
+    case NUMBER: {
       RedisModule_SaveSigned(rdb, value->value.number);
       break;
-    case OBJECT:
+    }
+    case OBJECT: {
       RedisModule_SaveUnsigned(rdb, value->value.object.size);
       break;
+    }
+    case STRING: {
+      RedisModule_SaveStringBuffer(
+        rdb,
+        value->value.string.data,
+        value->value.string.size
+      );
+      break;
+    }
   }
 }
 
@@ -73,7 +91,7 @@ static void freeKeyValue(JsonKeyVal* keyValue) {
 }
 
 static void freeObject(struct JsonObject* object) {
-  for(uint64_t i = 0; i < object->size; i++) {
+  for(size_t i = 0; i < object->size; i++) {
     freeKeyValue(object->elements[i]);
   }
   if(object->elements) RedisModule_Free(object->elements);
@@ -84,6 +102,10 @@ void JsonTypeFreeImpl(JsonValue* value) {
   switch(value->type) {
     case OBJECT:
       freeObject(&value->value.object);
+      break;
+    case STRING:
+      RedisModule_Free((void*)value->value.string.data);
+      RedisModule_Free(value);
       break;
     default: RedisModule_Free(value);
   }

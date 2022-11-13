@@ -7,3 +7,8 @@ JsonValue* parseJson(
   RedisModuleCtx* ctx,
   const char* json
 );
+
+RedisModuleString* jsonToString(
+  RedisModuleCtx* ctx,
+  JsonValue* val
+);

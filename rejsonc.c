@@ -54,24 +54,14 @@ int JsonSetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
   JsonValue* val = parseJson(ctx, json);
 
-  /* long long num;
-  RedisModule_StringToLongLong(argv[3], &num);
-  
-  JsonValue* ageV = allocNumber(num);
-
-  JsonValue* v =  allocObject(1);
-  JsonKeyVal* kv = RedisModule_Calloc(1, sizeof(JsonKeyVal));
-  kv->key = "age";
-  kv->value = ageV;
-  v->value.object.elements[0] = kv;
   if(keyType == REDISMODULE_KEYTYPE_EMPTY) {
-    RedisModule_ModuleTypeSetValue(key, jsonType, v);
+    RedisModule_ModuleTypeSetValue(key, jsonType, val);
   } else {
     JsonValue* v1 = RedisModule_ModuleTypeGetValue(key);
-    *v1 = *v;
-  } */
+    *v1 = *val;
+  }
 
-  RedisModule_ReplyWithStringBuffer(ctx, json, len);
+  RedisModule_ReplyWithSimpleString(ctx, "OK");
 
   return REDISMODULE_OK;
 }
@@ -98,18 +88,8 @@ int JsonGetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
   }
 
   JsonValue* v = RedisModule_ModuleTypeGetValue(key);
-  RedisModule_Log(
-    ctx,
-    REDISMODULE_LOGLEVEL_VERBOSE,
-    "type %d objlen %llu key %s valuetype %d value %lld",
-    v->type,
-    v->value.object.size,
-    v->value.object.elements[0]->key,
-    v->value.object.elements[0]->value->type,
-    v->value.object.elements[0]->value->value.number
-  );
-
-  RedisModule_ReplyWithLongLong(ctx, v->type);
+  RedisModuleString* str = jsonToString(ctx, v);
+  RedisModule_ReplyWithString(ctx, str);
   return REDISMODULE_OK;
 }
 

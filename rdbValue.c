@@ -17,6 +17,18 @@ void loadObject(
   }
 }
 
+void loadArray(
+  RedisModuleIO* rdb,
+  JsonArray* array
+) {
+  array->array = RedisModule_Calloc(array->size, sizeof(JsonValue*));
+  for(size_t i = 0; i < array->size; i++) {
+    JsonValue* elem = RedisModule_Calloc(1, sizeof(JsonValue));
+    JsonTypeRdbLoadImpl(rdb, elem);
+    array->array[i] = elem;
+  }
+}
+
 static void loadSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
   value->type = RedisModule_LoadUnsigned(rdb);
   switch(value->type) {
@@ -26,6 +38,10 @@ static void loadSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
     }
     case OBJECT: {
       value->value.object.size = RedisModule_LoadUnsigned(rdb);
+      break;
+    }
+    case ARRAY: {
+      value->value.array.size = RedisModule_LoadUnsigned(rdb);
       break;
     }
     case STRING: {
@@ -46,6 +62,10 @@ void JsonTypeRdbLoadImpl(RedisModuleIO* rdb, JsonValue* value) {
       loadObject(rdb, &value->value.object);
       break;
     }
+    case ARRAY: {
+      loadArray(rdb, &value->value.array);
+      break;
+    }
     default: break;
   }
 }
@@ -59,6 +79,10 @@ static void saveSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
     }
     case OBJECT: {
       RedisModule_SaveUnsigned(rdb, value->value.object.size);
+      break;
+    }
+    case ARRAY: {
+      RedisModule_SaveUnsigned(rdb, value->value.array.size);
       break;
     }
     case STRING: {
@@ -82,6 +106,11 @@ void JsonTypeRdbSaveImpl(RedisModuleIO* rdb, JsonValue* value) {
       RedisModule_SaveStringBuffer(rdb, keyVal->key, keySize);
       JsonTypeRdbSaveImpl(rdb, keyVal->value);
     }
+  } else if(value->type == ARRAY) {
+    JsonArray* array = &value->value.array;
+    for(int i = 0; i < array->size; i++) {
+      JsonTypeRdbSaveImpl(rdb, array->array[i]);
+    }
   }
 }
 
@@ -98,10 +127,21 @@ static void freeObject(struct JsonObject* object) {
   RedisModule_Free(object);
 }
 
+static void freeArray(JsonArray* array) {
+  for(size_t i = 0; i < array->size; i++) {
+    JsonTypeFreeImpl(array->array[i]);
+  }
+  if(array->array) RedisModule_Free(array->array);
+  RedisModule_Free(array);
+}
+
 void JsonTypeFreeImpl(JsonValue* value) {
   switch(value->type) {
     case OBJECT:
       freeObject(&value->value.object);
+      break;
+    case ARRAY:
+      freeArray(&value->value.array);
       break;
     case STRING:
       RedisModule_Free((void*)value->value.string.data);

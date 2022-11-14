@@ -5,6 +5,7 @@
 
 typedef enum {
   OBJECT,
+  ARRAY,
   NUMBER,
   STRING
 } JsonValueType;
@@ -22,6 +23,11 @@ struct JsonObject {
 };
 
 typedef struct {
+  struct JsonValue** array;
+  size_t size;
+} JsonArray;
+
+typedef struct {
   const char* data;
   size_t size;
 } JsonString;
@@ -31,6 +37,7 @@ typedef struct JsonValue {
     long long number;
     JsonString string;
     struct JsonObject object;
+    JsonArray array;
   } value;
   JsonValueType type;
 } JsonValue;

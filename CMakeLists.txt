@@ -1,12 +1,12 @@
 cmake_minimum_required(VERSION 3.10)
 
-project(rejsonc)
+project(redisjson)
 
 set(SOURCES
-  rejsonc.c
+  redisjson.c
   value.c
   rdbValue.c
   jsonToValue.c
 )
 
-add_library(rejsonc SHARED ${SOURCES})
+add_library(redisjson SHARED ${SOURCES})

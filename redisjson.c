@@ -73,6 +73,10 @@ int JsonGetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
   }
   RedisModule_AutoMemory(ctx);
   
+  if(RedisModule_KeyExists(ctx, argv[1]) == 0) {
+    RedisModule_ReplyWithError(ctx, "Key does not exist");
+    return REDISMODULE_ERR;
+  }
   RedisModuleKey* key = RedisModule_OpenKey(
     ctx,
     argv[1],
@@ -123,7 +127,7 @@ int JsonDelRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 }
 
 int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
-  if (RedisModule_Init(ctx, "rejsoncpp", 0, REDISMODULE_APIVER_1) ==
+  if (RedisModule_Init(ctx, "redisjson", 0, REDISMODULE_APIVER_1) ==
           REDISMODULE_ERR)
           return REDISMODULE_ERR;
 
@@ -137,7 +141,7 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
 
   jsonType = RedisModule_CreateDataType(
     ctx,
-    "rejsoncpp",
+    "redisjson",
     0,
     &typeMethods
   );

@@ -2,12 +2,14 @@
 
 #include "redismodule.h"
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef enum {
   OBJECT,
   ARRAY,
   NUMBER,
-  STRING
+  STRING,
+  BOOLEAN
 } JsonValueType;
 
 struct JsonValue;
@@ -36,6 +38,7 @@ typedef struct JsonValue {
   union {
     long long number;
     JsonString string;
+    bool boolean;
     struct JsonObject object;
     JsonArray array;
   } value;

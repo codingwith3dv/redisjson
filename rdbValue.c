@@ -52,6 +52,10 @@ static void loadSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
         );
       break;
     }
+    case BOOLEAN: {
+      value->value.boolean = RedisModule_LoadSigned(rdb);
+      break;
+    }
   }
 }
 
@@ -91,6 +95,10 @@ static void saveSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
         value->value.string.data,
         value->value.string.size
       );
+      break;
+    }
+    case BOOLEAN: {
+      RedisModule_SaveSigned(rdb, value->value.boolean);
       break;
     }
   }

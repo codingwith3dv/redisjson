@@ -138,6 +138,14 @@ JsonValue* parseValue(ParserContext* ctx) {
     val->value.string.data = str;
   } else if (ctx->json[ctx->index] == '[') {
     parseArray(ctx, val);
+  } else if (ctx->json[ctx->index] == 't') { // true
+    ctx->index += 4;
+    val->type = BOOLEAN;
+    val->value.boolean = true;
+  } else if (ctx->json[ctx->index] == 'f') { // false
+    ctx->index += 5;
+    val->type = BOOLEAN;
+    val->value.boolean = false;
   } else {
     long long number = 0;
     skipSpace(ctx);
@@ -228,6 +236,16 @@ static void valueToString(
         val->value.string.size
       );
       RedisModule_StringAppendBuffer(ctx, out, "\"", 1);
+      break;
+    }
+    case BOOLEAN: {
+      bool isTrue = val->value.boolean;
+      RedisModule_StringAppendBuffer(
+        ctx,
+        out,
+        isTrue ? "true" : "false",
+        isTrue ? 4 : 5
+      );
       break;
     }
     default:

@@ -7,7 +7,8 @@
 typedef enum {
   OBJECT,
   ARRAY,
-  NUMBER,
+  INTEGER,
+  DOUBLE,
   STRING,
   BOOLEAN
 } JsonValueType;
@@ -36,7 +37,8 @@ typedef struct {
 
 typedef struct JsonValue {
   union {
-    long long number;
+    int64_t integer;
+    double number;
     JsonString string;
     bool boolean;
     struct JsonObject object;

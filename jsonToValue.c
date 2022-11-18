@@ -10,9 +10,9 @@ typedef struct {
   RedisModuleCtx* rctx;
 } ParserContext;
 
-JsonValue* parseValue(ParserContext* ctx);
+static JsonValue* parseValue(ParserContext* ctx);
 
-void skipSpace(ParserContext* ctx) {
+static void skipSpace(ParserContext* ctx) {
   while(
     ctx->json[ctx->index] == ' ' ||
     ctx->json[ctx->index] == '\n'
@@ -21,7 +21,7 @@ void skipSpace(ParserContext* ctx) {
   }
 }
 
-const char* parseStr(ParserContext* ctx, size_t* length) {
+static const char* parseStr(ParserContext* ctx, size_t* length) {
   skipSpace(ctx);
   const char* start = ctx->json + ctx->index;
   const char* end = start;
@@ -50,7 +50,7 @@ const char* parseStr(ParserContext* ctx, size_t* length) {
   return 0;
 }
 
-void parseObject(ParserContext* ctx, JsonValue* val) {
+static void parseObject(ParserContext* ctx, JsonValue* val) {
   ++ctx->index;
   size_t elemSize = 0;
   struct JsonObject object;
@@ -93,7 +93,7 @@ void parseObject(ParserContext* ctx, JsonValue* val) {
   val->type = OBJECT;
 }
 
-void parseArray(ParserContext* ctx, JsonValue* val) {
+static void parseArray(ParserContext* ctx, JsonValue* val) {
   ++ctx->index;
   JsonArray array;
   array.size = 0;
@@ -122,7 +122,7 @@ void parseArray(ParserContext* ctx, JsonValue* val) {
   val->type = ARRAY;
 }
 
-JsonValue* parseValue(ParserContext* ctx) {
+static JsonValue* parseValue(ParserContext* ctx) {
   JsonValue* val = RedisModule_Calloc(1, sizeof(JsonValue));
   skipSpace(ctx);
   if(ctx->json[ctx->index] == '{') {
@@ -147,14 +147,43 @@ JsonValue* parseValue(ParserContext* ctx) {
     val->type = BOOLEAN;
     val->value.boolean = false;
   } else {
-    long long number = 0;
-    skipSpace(ctx);
-    while(ctx->json[ctx->index] >= '0' && ctx->json[ctx->index] <= '9') {
-      number = (number * 10) + (ctx->json[ctx->index] - 48);
+    bool negative;
+    if(ctx->json[ctx->index] == '-') {
+      negative = true;
+      ++ctx->index;
+    } else if(ctx->json[ctx->index] == '+') {
+      negative = false;
       ++ctx->index;
     }
-    val->value.number = number;
-    val->type = NUMBER;
+    double number = 0;
+    bool isDecimal = false;
+    int numOfDecimals = 1;
+    skipSpace(ctx);
+    while(1) {
+      if(ctx->json[ctx->index] >= '0' && ctx->json[ctx->index] <= '9') {
+        if(!isDecimal) {
+          number = (number * 10) + (ctx->json[ctx->index] - 48);
+          ++ctx->index;
+        } else {
+          number = number + ((ctx->json[ctx->index] - 48) / pow(10, numOfDecimals));
+          ++ctx->index;
+        }
+        continue;
+      }
+      if(ctx->json[ctx->index] == '.') {
+        isDecimal = true;
+        ++ctx->index;
+        continue;
+      }
+      break;
+    }
+    if(isDecimal) {
+      val->value.number = negative ? -number : number;
+      val->type = DOUBLE;
+    } else {
+      val->value.integer = (int64_t)(negative ? -number : number);
+      val->type = INTEGER;
+    }
   }
   return val;
 }
@@ -220,11 +249,16 @@ static void valueToString(
     case ARRAY:
       arrayToString(ctx, val, out);
       break;
-    case NUMBER: {
-      int len = (int)((ceil(log10(val->value.number)))*sizeof(char));
-      char buf[len];
-      sprintf(buf, "%lld", val->value.number);
-      RedisModule_StringAppendBuffer(ctx, out, buf, len);
+    case DOUBLE: {
+      char buf[128];
+      sprintf(buf, "%.17g", val->value.number);
+      RedisModule_StringAppendBuffer(ctx, out, buf, strlen(buf));
+      break;
+    }
+    case INTEGER: {
+      char buf[15 + 1 + 1];
+      sprintf(buf, "%lld", val->value.integer);
+      RedisModule_StringAppendBuffer(ctx, out, buf, strlen(buf));
       break;
     }
     case STRING: {

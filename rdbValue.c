@@ -32,8 +32,12 @@ void loadArray(
 static void loadSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
   value->type = RedisModule_LoadUnsigned(rdb);
   switch(value->type) {
-    case NUMBER: {
-      value->value.number = RedisModule_LoadSigned(rdb);
+    case DOUBLE: {
+      value->value.number = RedisModule_LoadDouble(rdb);
+      break;
+    }
+    case INTEGER: {
+      value->value.integer = RedisModule_LoadSigned(rdb);
       break;
     }
     case OBJECT: {
@@ -77,8 +81,12 @@ void JsonTypeRdbLoadImpl(RedisModuleIO* rdb, JsonValue* value) {
 static void saveSimpleJson(RedisModuleIO* rdb, JsonValue* value) {
   RedisModule_SaveUnsigned(rdb, value->type);
   switch(value->type) {
-    case NUMBER: {
-      RedisModule_SaveSigned(rdb, value->value.number);
+    case DOUBLE: {
+      RedisModule_SaveDouble(rdb, value->value.number);
+      break;
+    }
+    case INTEGER: {
+      RedisModule_SaveSigned(rdb, value->value.integer);
       break;
     }
     case OBJECT: {

@@ -7,6 +7,7 @@ set(SOURCES
   value.c
   rdbValue.c
   jsonToValue.c
+  path.c
 )
 
 add_library(redisjson SHARED ${SOURCES})

@@ -1,6 +1,7 @@
 #include "redismodule.h"
 #include "value.h"
 #include "jsonToValue.h"
+#include "path.h"
 
 static RedisModuleType* jsonType;
 
@@ -67,7 +68,7 @@ int JsonSetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 }
 
 int JsonGetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
-  if(argc < 2) {
+  if(argc < 3) {
     RedisModule_WrongArity(ctx);
     return REDISMODULE_ERR;
   }
@@ -91,7 +92,13 @@ int JsonGetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
     return REDISMODULE_ERR;
   }
 
+  RedisModuleString* path = argv[2];
   JsonValue* v = RedisModule_ModuleTypeGetValue(key);
+  v = evalPath(ctx, v, path);
+  if(!v) {
+    RedisModule_ReplyWithError(ctx, "Path error");
+    return REDISMODULE_ERR;
+  }
   RedisModuleString* str = jsonToString(ctx, v);
   RedisModule_ReplyWithString(ctx, str);
   return REDISMODULE_OK;

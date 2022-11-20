@@ -25,16 +25,10 @@ static const char* parseStr(ParserContext* ctx, size_t* length) {
   skipSpace(ctx);
   const char* start = ctx->json + ctx->index;
   const char* end = start;
-  if(
-    ctx->json[ctx->index] == '"' ||
-    ctx->json[ctx->index] == '\''
-  ) {
+  if(ctx->json[ctx->index] == '"') {
     ++start;
     ++ctx->index;
-    while(
-      ctx->json[ctx->index] != '"' &&
-      ctx->json[ctx->index] != '\''
-    ) {
+    while(ctx->json[ctx->index] != '"') {
       ++ctx->index;
       ++end;
     }

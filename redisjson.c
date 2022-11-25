@@ -94,7 +94,7 @@ int JsonGetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
   RedisModuleString* path = argv[2];
   JsonValue* v = RedisModule_ModuleTypeGetValue(key);
-  v = evalPath(ctx, v, path);
+  v = evalPath(ctx, v, path)[0];
   if(!v) {
     RedisModule_ReplyWithError(ctx, "Path error");
     return REDISMODULE_ERR;

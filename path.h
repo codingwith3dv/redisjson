@@ -3,7 +3,7 @@
 #include "redismodule.h"
 #include "value.h"
 
-JsonValue* evalPath(
+JsonValue** evalPath(
   RedisModuleCtx* ctx,
   JsonValue* value,
   RedisModuleString* path

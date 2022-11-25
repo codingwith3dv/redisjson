@@ -8,29 +8,31 @@ typedef union {
 } Path;
 
 typedef struct {
-  Path* data;
+  char* data;
   size_t cap;
   size_t len;
+  size_t elemSize;
 } Vector;
 
-void vecNew(Vector* v, size_t cap) {
+void vecNew(Vector* v, size_t cap, size_t elemSize) {
   v->cap = cap;
   v->len = 0;
-  v->data = RedisModule_Alloc(sizeof(void*) * v->cap);
+  v->elemSize = elemSize;
+  v->data = RedisModule_Alloc(v->elemSize * v->cap);
 }
 
 void vecResize(Vector* v, size_t cap) {
   if(!v) return;
-  v->data = RedisModule_Realloc(v->data, sizeof(void*) * cap);
+  v->data = RedisModule_Realloc(v->data, v->elemSize * cap);
   v->cap = cap;
 }
 
-void vecPush(Vector* v, Path value) {
+void vecPush(Vector* v, char* value) {
   if(!v) return;
   if(v->cap <= v->len) {
     vecResize(v, v->cap * 2);
   }
-  v->data[v->len++] = value;
+  memcpy(v->data + (v->elemSize * v->len++), value, v->elemSize);
 }
 
 void vecDel(Vector* v) {
@@ -53,7 +55,7 @@ char* _strdup(const char *str1, size_t len) {
   return str2;
 }
 
-JsonValue* evalPath(
+JsonValue** evalPath(
   RedisModuleCtx* ctx,
   JsonValue* value,
   RedisModuleString* path
@@ -64,7 +66,7 @@ JsonValue* evalPath(
   State state = START;
 
   Vector paths;
-  vecNew(&paths, 1);
+  vecNew(&paths, 1, sizeof(Path));
 
   const char* tok = cpath2;
   size_t tokLen = 0;
@@ -139,33 +141,39 @@ JsonValue* evalPath(
         }
         path.index = index;
       }
-      vecPush(&paths, path);
+      vecPush(&paths, (char*)&path);
       tok = cpath2;
       tokLen = 0;
     }
   }
 
-  if(paths.len == 1 && !strcmp(paths.data[0].key, "$")) {
-    return value;
+  Vector currArr;
+  vecNew(&currArr, 1, sizeof(JsonValue*));
+  vecPush(&currArr, (char*)&value);
+  JsonValue** data = (JsonValue**)currArr.data;
+  Path* pdata = (Path*)paths.data;
+  if(paths.len == 1 && !strcmp(pdata[0].key, "$")) {
+    return data;
   }
-  JsonValue* curr = value;
   for(size_t i = 0; i < paths.len; i++) {
-    if(curr->type == OBJECT) {
-      struct JsonObject obj = curr->value.object;
-      for(size_t j = 0; j < obj.size; j++) {
-        if(!strcmp(obj.elements[j]->key, paths.data[i].key)) {
-          curr = obj.elements[j]->value;
+    for(size_t j = 0; j < currArr.len; j++) {
+      if(data[j]->type == OBJECT) {
+        struct JsonObject obj = data[j]->value.object;
+        for(size_t k = 0; k < obj.size; k++) {
+          if(!strcmp(obj.elements[k]->key, pdata[i].key)) {
+            data[j]= obj.elements[k]->value;
+          }
         }
-      }
-    } else if(curr->type == ARRAY) {
-      JsonArray arr = curr->value.array;
-      size_t index = paths.data[i].index;
-      if(index >= 0 && index < arr.size) {
-        curr = arr.array[index];
+      } else if(data[j]->type == ARRAY) {
+        JsonArray arr = data[j]->value.array;
+        size_t index = pdata[i].index;
+        if(index >= 0 && index < arr.size) {
+          data[j] = arr.array[index];
+        }
       }
     }
   }
 
   vecDel(&paths);
-  return curr;
+  return (JsonValue**)currArr.data;
 }

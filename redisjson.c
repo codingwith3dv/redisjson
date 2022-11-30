@@ -94,13 +94,17 @@ int JsonGetRedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc)
 
   RedisModuleString* path = argv[2];
   JsonValue* v = RedisModule_ModuleTypeGetValue(key);
-  v = evalPath(ctx, v, path)[0];
-  if(!v) {
-    RedisModule_ReplyWithError(ctx, "Path error");
-    return REDISMODULE_ERR;
+  size_t length;
+  JsonValue** data = evalPath(ctx, v, path, &length);
+  RedisModuleString* out
+    = RedisModule_CreateString(ctx, "", 0);
+  for(size_t i = 0; i < length; i++) {
+    RedisModuleString* rstr = jsonToString(ctx, data[i]);
+    size_t len;
+    const char* str = RedisModule_StringPtrLen(rstr, &len);
+    RedisModule_StringAppendBuffer(ctx, out, str, len);
   }
-  RedisModuleString* str = jsonToString(ctx, v);
-  RedisModule_ReplyWithString(ctx, str);
+  RedisModule_ReplyWithString(ctx, out);
   return REDISMODULE_OK;
 }
 

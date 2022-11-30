@@ -2,17 +2,18 @@
 #include <string.h>
 #include <ctype.h>
 
+typedef enum {
+  CSNONE = 0,
+  CSOBJECT = 1,
+  CSARRAY = 2,
+  CSRDESCENT = 3
+} CharState;
+
 typedef union {
   size_t index;
   const char* key;
+  CharState sstate;
 } Path;
-
-typedef struct {
-  char* data;
-  size_t cap;
-  size_t len;
-  size_t elemSize;
-} Vector;
 
 void vecNew(Vector* v, size_t cap, size_t elemSize) {
   v->cap = cap;
@@ -27,7 +28,7 @@ void vecResize(Vector* v, size_t cap) {
   v->cap = cap;
 }
 
-void vecPush(Vector* v, char* value) {
+void vecPush(Vector* v, void* value) {
   if(!v) return;
   if(v->cap <= v->len) {
     vecResize(v, v->cap * 2);
@@ -40,9 +41,17 @@ void vecDel(Vector* v) {
   RedisModule_Free(v->data);
 }
 
+void vecClear(Vector* v) {
+  if(!v) return;
+  if(v->data) RedisModule_Free(v->data);
+  v->len = 0;
+  vecNew(v, 1, v->elemSize);
+}
+
 typedef enum {
   START,
   ROOT,
+  DOT,
   WORD,
   SBRACKET,
   NUMBER
@@ -55,10 +64,33 @@ char* _strdup(const char *str1, size_t len) {
   return str2;
 }
 
+Vector* recursiveSearch(
+  JsonValue* val,
+  const char* key,
+  Vector* vals) {
+  if(val->type == OBJECT) {
+    struct JsonObject object = val->value.object;
+    for(size_t i = 0; i < object.size; i++) {
+      JsonKeyVal* keyVal = object.elements[i];
+      if(!strcmp(keyVal->key, key)) {
+        vecPush(vals, &keyVal->value);
+      }
+      vals = recursiveSearch(keyVal->value, key, vals);
+    }
+  } else if(val->type == ARRAY) {
+    JsonArray array = val->value.array;
+    for(size_t i = 0; i < array.size; i++) {
+      vals = recursiveSearch(array.array[i], key, vals);
+    }
+  }
+  return vals;
+}
+
 JsonValue** evalPath(
   RedisModuleCtx* ctx,
   JsonValue* value,
-  RedisModuleString* path
+  RedisModuleString* path,
+  size_t* outLen
 ) {
   size_t clen;
   const char* cpath = RedisModule_StringPtrLen(path, &clen);
@@ -72,6 +104,7 @@ JsonValue** evalPath(
   size_t tokLen = 0;
   size_t i = 0;
   bool isTokNum = false;
+  CharState sstate = CSNONE;
 
   while(i < clen) {
     char ch = *cpath2;
@@ -83,10 +116,18 @@ JsonValue** evalPath(
         }
         break;
       }
+      case DOT:
       case ROOT: {
         if(isalpha(ch) || ch == '$') {
           ++tokLen;
           state = WORD;
+        } else if(ch == '.') {
+          ++tokLen;
+          state = DOT;
+          sstate = CSRDESCENT;
+          ++cpath2;
+          ++i;
+          goto tokEnd;
         }
         break;
       }
@@ -100,6 +141,7 @@ JsonValue** evalPath(
       case NUMBER: {
         if(ch == ']') {
           state = START;
+          sstate = CSARRAY;
           isTokNum = true;
           ++cpath2;
           ++i;
@@ -112,7 +154,8 @@ JsonValue** evalPath(
       }
       case WORD: {
         if(ch == '.' || ch == '[') {
-          state = ch == '.' ? ROOT : SBRACKET;
+          state = ch == '.' ? DOT : SBRACKET;
+          sstate = CSOBJECT;
           isTokNum = false;
           ++cpath2;
           ++i;
@@ -126,22 +169,31 @@ JsonValue** evalPath(
     ++cpath2;
     if((clen == i) && (state == WORD)) {
       state = START;
+      sstate = CSOBJECT;
       isTokNum = false;
       goto tokEnd;
     }
     continue;
     tokEnd: {
       Path path;
-      if(!isTokNum) {
-        path.key = _strdup(tok, tokLen);
-      } else {
-        size_t index = 0;
-        for(size_t j = 0; j < tokLen; j++) {
-          index = index * 10 + (tok[j] - 48);
+      
+      path.sstate = sstate;
+      switch(sstate) {
+        case CSOBJECT:
+          path.key = _strdup(tok, tokLen);
+          break;
+        case CSARRAY: {
+          size_t index = 0;
+          for(size_t j = 0; j < tokLen; j++) {
+            index = index * 10 + (tok[j] - 48);
+          }
+          path.index = index;
+          break;
         }
-        path.index = index;
+        default: break;
       }
-      vecPush(&paths, (char*)&path);
+      sstate = CSNONE;
+      vecPush(&paths, &path);
       tok = cpath2;
       tokLen = 0;
     }
@@ -149,13 +201,19 @@ JsonValue** evalPath(
 
   Vector currArr;
   vecNew(&currArr, 1, sizeof(JsonValue*));
-  vecPush(&currArr, (char*)&value);
+  vecPush(&currArr, &value);
   JsonValue** data = (JsonValue**)currArr.data;
   Path* pdata = (Path*)paths.data;
   if(paths.len == 1 && !strcmp(pdata[0].key, "$")) {
+    *outLen = 1;
     return data;
   }
   for(size_t i = 0; i < paths.len; i++) {
+    if(pdata[i].sstate == CSRDESCENT) {
+      vecClear(&currArr);
+      currArr = *recursiveSearch(data[0], pdata[i + 1].key, &currArr);
+      continue;
+    }
     for(size_t j = 0; j < currArr.len; j++) {
       if(data[j]->type == OBJECT) {
         struct JsonObject obj = data[j]->value.object;
@@ -175,5 +233,6 @@ JsonValue** evalPath(
   }
 
   vecDel(&paths);
-  return (JsonValue**)currArr.data;
+  *outLen = currArr.len;
+  return data;
 }

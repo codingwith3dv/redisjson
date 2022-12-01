@@ -285,7 +285,6 @@ RedisModuleString* jsonToString(
   RedisModuleCtx* ctx,
   JsonValue* val
 ) {
-    printf("after type: %u\n", val->type);
   RedisModuleString* str = RedisModule_CreateString(ctx, "", 0);
   valueToString(ctx, val, str);
   return str;

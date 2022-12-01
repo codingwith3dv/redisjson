@@ -86,11 +86,10 @@ Vector* recursiveSearch(
   return vals;
 }
 
-JsonValue** evalPath(
+JsonValue* evalPath(
   RedisModuleCtx* ctx,
   JsonValue* value,
-  RedisModuleString* path,
-  size_t* outLen
+  RedisModuleString* path
 ) {
   size_t clen;
   const char* cpath = RedisModule_StringPtrLen(path, &clen);
@@ -205,8 +204,7 @@ JsonValue** evalPath(
   JsonValue** data = (JsonValue**)currArr.data;
   Path* pdata = (Path*)paths.data;
   if(paths.len == 1 && !strcmp(pdata[0].key, "$")) {
-    *outLen = 1;
-    return data;
+    return data[0];
   }
   for(size_t i = 0; i < paths.len; i++) {
     if(pdata[i].sstate == CSRDESCENT) {
@@ -233,6 +231,14 @@ JsonValue** evalPath(
   }
 
   vecDel(&paths);
-  *outLen = currArr.len;
-  return data;
+  if(currArr.len > 1) {
+    JsonValue* val = RedisModule_Alloc(sizeof(JsonValue));
+    JsonArray arr;
+    arr.array = data;
+    arr.size = currArr.len;
+    val->type = ARRAY;
+    val->value.array = arr;
+    return val;
+  }
+  return data[0];
 }

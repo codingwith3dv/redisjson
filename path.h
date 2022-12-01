@@ -10,9 +10,8 @@ typedef struct {
   size_t elemSize;
 } Vector;
 
-JsonValue** evalPath(
+JsonValue* evalPath(
   RedisModuleCtx* ctx,
   JsonValue* value,
-  RedisModuleString* path,
-  size_t* outLen
+  RedisModuleString* path
 );
